@@ -571,13 +571,23 @@ async function createNewProduct() {
   const imageUrl = document.getElementById("newProductImages").value.trim();
 
   // Validation
-  if (!title) {
-    alert("Tên sản phẩm không được để trống!");
+  if (!title || title.length < 3) {
+    alert("Tên sản phẩm phải ít nhất 3 ký tự!");
     return;
   }
 
-  if (isNaN(price) || price < 0) {
-    alert("Giá phải là số dương!");
+  if (title.length > 150) {
+    alert("Tên sản phẩm không được quá 150 ký tự!");
+    return;
+  }
+
+  if (isNaN(price) || price <= 0) {
+    alert("Giá phải là số lớn hơn 0!");
+    return;
+  }
+
+  if (description && description.length > 500) {
+    alert("Mô tả không được quá 500 ký tự!");
     return;
   }
 
@@ -591,6 +601,16 @@ async function createNewProduct() {
     return;
   }
 
+  // Validate image URL format
+  if (
+    !imageUrl.startsWith("http://") &&
+    !imageUrl.startsWith("https://") &&
+    !imageUrl.startsWith("data:")
+  ) {
+    alert("URL hình ảnh phải bắt đầu bằng http://, https:// hoặc data:");
+    return;
+  }
+
   // Show loading
   const createBtn = document.getElementById("createProductBtn");
   const originalText = createBtn.innerHTML;
@@ -598,29 +618,39 @@ async function createNewProduct() {
   createBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Đang tạo...';
 
   try {
+    // Prepare request body
+    const requestBody = {
+      title: title,
+      price: Math.round(price * 100) / 100, // Ensure 2 decimal places
+      description: description || "Sản phẩm mới",
+      categoryId: categoryId,
+      images: [imageUrl],
+    };
+
+    console.log("Creating product with:", requestBody);
+
     // Call API to create product
     const response = await fetch("https://api.escuelajs.co/api/v1/products/", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        title: title,
-        price: price,
-        description: description || "Không có mô tả",
-        categoryId: categoryId,
-        images: [imageUrl],
-      }),
+      body: JSON.stringify(requestBody),
     });
 
+    const responseData = await response.json();
+
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      console.error("API Error:", responseData);
+      throw new Error(
+        responseData.message || `HTTP error! status: ${response.status}`,
+      );
     }
 
-    const newProduct = await response.json();
+    const newProduct = responseData;
 
     // Add to local data
-    allProducts.unshift(newProduct); // Add to beginning
+    allProducts.unshift(newProduct);
     filteredProducts = [...allProducts];
 
     // Refresh the display
@@ -628,7 +658,9 @@ async function createNewProduct() {
     displayProducts(allProducts);
 
     // Show success message
-    alert(`Tạo sản phẩm thành công! ID: ${newProduct.id}`);
+    alert(
+      `✅ Tạo sản phẩm thành công!\nID: ${newProduct.id}\nTên: ${newProduct.title}`,
+    );
 
     // Close modal and reset form
     const modal = bootstrap.Modal.getInstance(
@@ -638,7 +670,9 @@ async function createNewProduct() {
     document.getElementById("createProductForm").reset();
   } catch (error) {
     console.error("Error creating product:", error);
-    alert(`Lỗi tạo sản phẩm: ${error.message}`);
+    alert(
+      `❌ Lỗi tạo sản phẩm:\n${error.message}\n\nVui lòng kiểm tra dữ liệu nhập`,
+    );
   } finally {
     createBtn.disabled = false;
     createBtn.innerHTML = originalText;
